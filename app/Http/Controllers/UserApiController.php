@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Validator;
+use Auth;
 
 class UserApiController extends Controller
 {
@@ -178,6 +179,86 @@ class UserApiController extends Controller
             }
         }
        
+    }
+
+
+// Register Api using passport
+    public function registerUserUsingPassport(Request $request){
+
+        $data=$request->all();
+        // return $data;
+
+        $rules = [
+            'name'=>'required',
+            'email'=>'required|email|unique:users',
+            'password'=>'required'
+        ];
+
+        $customMessage = [
+            'name.required'=>'Name is required',
+            'email.required'=>'Email is required',
+            'email.email'=>'Email must be a valid email',
+            'password.required'=>'Password is required',
+        ];
+
+        $validator = Validator::make($data, $rules, $customMessage);
+        if($validator->fails()){
+            return response()->json($validator->errors(),422);
+        }
+
+        $user = new User();
+        $user->name = $data['name'];
+        $user->email = $data['email'];
+        $user->password = bcrypt($data['password']);
+        $user-> save();
+
+        if(Auth::attempt(['email'=>$data['email'],'password'=>$data['password']])){
+            $user = User::where('email',$data['email'])->first();
+            $access_token = $user->createToken($data['email'])->accessToken;
+            User::where('email',$data['email'])->update(['access_token'=>$access_token]);
+
+            $message = 'User Successfully Registered';
+            return response()->json(['message'=>$message,'access_token'=>$access_token],201);
+        }else{
+            $message = 'Opps! something went wrong';
+            return response()->json(['message'=>$message],422);
+        } 
+
+    }
+
+    public function loginUserUsingPassport(Request $request){
+        $data=$request->all();
+        // return $data;
+
+        $rules = [
+            'email'=>'required|email|exists:users',
+            'password'=>'required'
+        ];
+
+        $customMessage = [
+            'email.required'=>'Email is required',
+            'email.email'=>'Email must be a valid email',
+            'email.exists'=>'Email does not exists',
+            'password.required'=>'Password is required',
+        ];
+
+        $validator = Validator::make($data, $rules, $customMessage);
+        if($validator->fails()){
+            return response()->json($validator->errors(),422);
+        }
+
+        if(Auth::attempt(['email'=>$data['email'],'password'=>$data['password']])){
+            $user = User::where('email',$data['email'])->first();
+            $access_token = $user->createToken($data['email'])->accessToken;
+            User::where('email',$data['email'])->update(['access_token'=>$access_token]);
+
+            $message = 'User Successfully Login';
+            return response()->json(['message'=>$message,'access_token'=>$access_token],201);
+        }else{
+            $message = 'Invalid email or password';
+            return response()->json(['message'=>$message],422);
+        } 
+
     }
 
 
